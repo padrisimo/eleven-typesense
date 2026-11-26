@@ -107,13 +107,21 @@ Measured medians of 5 runs (same query, top 5 titles):
 
 Keyword matching tokens ("sound", "hinge") returns generic ambience; hybrid search surfaces actual creaking-door effects. Filters and facets work unchanged in hybrid mode.
 
+## Production
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Only Caddy publishes ports (80/443 with automatic HTTPS); set `DOMAIN`, `CADDY_EMAIL`, a strong `POSTGRES_PASSWORD` and `TYPESENSE_API_KEY` in `.env` first. The full GCP runbook (bucket, least-privilege service account, VM, firewall, backup and teardown) is in `docs/DEPLOY.md`.
+
 ## Documentation
 
-- `docs/ARCHITECTURE.md` — architecture diagram (Phase 6)
+- `docs/ARCHITECTURE.md` — architecture diagram and write/search paths
 - `docs/DECISIONS.md` — decisions and rejected alternatives
 - `docs/EXPLAIN_REPORT.md` — Postgres before/after indexes (Phase 3)
-- `docs/DEPLOY.md` — GCP VM + Compose runbook (Phase 6)
-- `docs/INTERVIEW_NOTES.md` — talking points with measured numbers (Phase 6)
+- `docs/DEPLOY.md` — GCP VM + Compose runbook
+- `docs/INTERVIEW_NOTES.md` — talking points with measured numbers
 
 ## Development
 

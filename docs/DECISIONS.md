@@ -139,3 +139,17 @@
 - **Reason:** CPU inference is slow; the vertical slice needs a measurable semantic-vs-keyword comparison, not a full production backfill.
 - **Alternative rejected:** Embedding all 200k on CPU (too slow for the time budget) or leaving v1 active (no semantic search).
 - **When I would change it:** In production, backfill all documents with a batch/GPU worker and monitor index coverage; keep the same alias-swap mechanism.
+
+## Caddy as the only published port in production (Phase 6)
+
+- **Decision:** `docker-compose.prod.yml` adds Caddy 2.9 on the `edge` network publishing 80/443 (and 443/udp), while Postgres, Typesense and the API expose no host ports; the dev override still binds them to `127.0.0.1`.
+- **Reason:** One TLS terminator with automatic HTTPS, a smaller attack surface, and the same Compose file works locally and on the VM.
+- **Alternative rejected:** Terminating TLS in FastAPI (extra complexity, harder certificate renewal) or publishing the API directly (no single place for access control).
+- **When I would change it:** Behind a managed load balancer or Cloud Run, where HTTPS is provided by the platform.
+
+## Deployment delivered as a runbook, not executed (Phase 6)
+
+- **Decision:** `docs/DEPLOY.md` contains the gcloud commands for a VM, bucket, least-privilege service account, firewall and a final teardown; no gcloud command was run and no paid resource was created.
+- **Reason:** The user controls cloud spend and account permissions; the interview only needs the decisions and a reproducible path.
+- **Alternative rejected:** Creating resources during development (cost and cleanup risk) or omitting the runbook (no deployment story).
+- **When I would change it:** On explicit confirmation, execute the runbook with real credentials and record the resulting instance/bucket names.
