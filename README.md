@@ -115,6 +115,24 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 Only Caddy publishes ports (80/443 with automatic HTTPS); set `DOMAIN`, `CADDY_EMAIL`, a strong `POSTGRES_PASSWORD` and `TYPESENSE_API_KEY` in `.env` first. The full GCP runbook (bucket, least-privilege service account, VM, firewall, backup and teardown) is in `docs/DEPLOY.md`.
 
+## Web UI
+
+A React + Vite + TypeScript client built with Ant Design. Start the API first, then:
+
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. Vite proxies `/api` to `http://127.0.0.1:8000`, so no CORS setup is needed. The page supports keyword/hybrid search, category/format/tag/duration filters, audio preview, simulated download and an AI generation modal; the GitHub link is in the top-right corner. Override the repository URL with `VITE_GITHUB_URL` in `ui/.env.local` if you fork it.
+
+```bash
+npm run build   # typecheck + production bundle in ui/dist
+```
+
+Pinned versions: React 19.3.1, Ant Design 6.7.2, Vite 8.4.0, TypeScript 5.9.3. Vite requires Node 20.19+ or 22.12+.
+
 ## Documentation
 
 - `docs/ARCHITECTURE.md` — architecture diagram and write/search paths

@@ -153,3 +153,10 @@
 - **Reason:** The user controls cloud spend and account permissions; the runbook documents the decisions and a reproducible path.
 - **Alternative rejected:** Creating resources during development (cost and cleanup risk) or omitting the runbook (no deployment story).
 - **When I would change it:** On explicit confirmation, execute the runbook with real credentials and record the resulting instance/bucket names.
+
+## Optional React UI with Ant Design behind a Vite proxy
+
+- **Decision:** `ui/` is a React 19 + Vite 8 + TypeScript 5.9 client using Ant Design 6.7.2, with exact pinned versions and a GitHub link in the top-right corner. Vite proxies `/api` to the local API and strips the prefix; the UI does not call `http://localhost:8000` directly.
+- **Reason:** Ant Design gives a polished search/filter/modal UI without custom component work, and the proxy avoids adding CORS middleware to a small API only for development.
+- **Alternative rejected:** Plain CSS components (more code for the same result), server-rendered templates (poorer interaction), or direct cross-origin calls (would require new API middleware).
+- **When I would change it:** If the UI ships to production, add a Caddy `handle /api/*` rewrite or serve the built assets behind the same origin; for a larger app, consider route/code splitting to reduce the current 825 kB bundle.
