@@ -2,7 +2,130 @@
 
 This is a runbook, not an executed deployment. No `gcloud` command was run while building this project. Estimated cost is a single small VM plus a regional bucket; stop or tear down when finished.
 
-## 0. Local variables
+## Free-tier demo path ($0 within quotas)
+
+Google's Free Program still requires a billing account, but the following fits its published limits: **one non-preemptible e2-micro per month** in `us-west1`, `us-central1` or `us-east1`, **30 GB-months** of standard persistent disk and **1 GB** of North America egress. Cloud Storage gives 5 GB-months in US regions. Cloud Run has a free tier, but it does not include Postgres or Typesense, so it does not remove the need for a VM here.
+
+This path uses **local audio storage**, 10,000 seeded sounds, one gunicorn worker, no embeddings and a free `sslip.io` hostname instead of a purchased domain. The standard paid path below remains the full 200k setup.
+
+### 1. Variables and APIs
+
+```bash
+export PROJECT_ID=my-gcp-project
+export REGION=us-central1
+export ZONE=us-central1-a
+export VM_NAME=soundseek-free
+export SA_NAME=soundseek-free-app
+export SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
+export MY_IP=$(curl -s https://ifconfig.me)
+
+gcloud config set project "$PROJECT_ID"
+gcloud services enable compute.googleapis.com
+```
+
+### 2. Service account and VM
+
+```bash
+gcloud iam service-accounts create "$SA_NAME" --display-name="Soundseek free demo"
+
+gcloud compute instances create "$VM_NAME" \
+  --zone="$ZONE" \
+  --machine-type=e2-micro \
+  --boot-disk-size=30GB \
+  --boot-disk-type=pd-standard \
+  --image-family=debian-12 \
+  --image-project=debian-cloud \
+  --service-account="$SA_EMAIL" \
+  --scopes=https://www.googleapis.com/auth/cloud-platform \
+  --tags=soundseek-free
+
+gcloud compute firewall-rules create allow-soundseek-free-web \
+  --network=default --allow=tcp:80,tcp:443 --target-tags=soundseek-free
+
+gcloud compute firewall-rules create allow-soundseek-free-ssh \
+  --network=default --allow=tcp:22 --source-ranges="$MY_IP/32" --target-tags=soundseek-free
+```
+
+Get the public IP and derive the hostname. `sslip.io` resolves `<ip>.sslip.io` to that IP; its own documentation cites Caddy + Let's Encrypt HTTP-01 as a supported example.
+
+```bash
+export EXTERNAL_IP=$(gcloud compute instances describe "$VM_NAME" --zone="$ZONE" \
+  --format='value(networkInterfaces[0].accessConfigs[0].natIP)')
+export DOMAIN="$EXTERNAL_IP.sslip.io"
+echo "$DOMAIN"
+```
+
+### 3. Build and copy the UI, then deploy
+
+Build the UI locally because the VM has no Node 22 installed:
+
+```bash
+(cd ui && npm install && npm run build)
+gcloud compute scp --recurse ui/dist "$VM_NAME":~/soundseek-dist --zone="$ZONE"
+```
+
+SSH into the VM:
+
+```bash
+gcloud compute ssh "$VM_NAME" --zone="$ZONE"
+```
+
+Inside the VM:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git curl docker.io docker-compose-plugin
+sudo usermod -aG docker "$USER"
+newgrp docker
+
+git clone https://github.com/padrisimo/eleven-typesense.git
+cd eleven-typesense
+mkdir -p ui && cp -r ~/soundseek-dist ui/dist
+
+cat > .env <<EOF
+POSTGRES_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 24)
+TYPESENSE_API_KEY=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 24)
+LOCAL_SIGNING_SECRET=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 24)
+STORAGE_BACKEND=local
+GENERATOR=mock
+GUNICORN_WORKERS=1
+DOMAIN=$DOMAIN
+CADDY_EMAIL=admin@$DOMAIN
+EOF
+
+set -a; . ./.env; set +a
+DC="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+DSN="postgresql://soundsnap:${POSTGRES_PASSWORD}@db:5432/soundsnap"
+
+$DC up -d --build
+$DC exec api python /db/seed.py --dsn "$DSN" --count 10000
+$DC exec api python /scripts/reindex.py --dsn "$DSN" --set-alias
+
+curl -fsS https://$DOMAIN/health
+curl -fsS https://$DOMAIN/api/health
+curl -fsS https://$DOMAIN/
+```
+
+Caddy serves the built UI at `/`, proxies `/api/*` to the API with the prefix stripped, and keeps `/health` for compatibility. Do not enable `--with-embeddings` on e2-micro: CPU inference is too slow for 1 GB of RAM.
+
+### 4. Free-tier operations and teardown
+
+```bash
+# Stop the VM when not in use; free tier is counted by hours per month.
+gcloud compute instances stop "$VM_NAME" --zone="$ZONE"
+gcloud compute instances start "$VM_NAME" --zone="$ZONE"
+
+# Irreversible: deletes the demo VM, rules and service account.
+gcloud compute instances delete "$VM_NAME" --zone="$ZONE" --quiet
+gcloud compute firewall-rules delete allow-soundseek-free-web allow-soundseek-free-ssh --quiet
+gcloud iam service-accounts delete "$SA_EMAIL" --quiet
+```
+
+If you later add the optional GCS bucket, create it in `us-central1` with `--uniform-bucket-level-access` and add it to the teardown block.
+
+## Standard production path (paid)
+
+### 0. Local variables
 
 Run these in your shell and keep them for the teardown block:
 
@@ -84,7 +207,7 @@ sudo apt-get install -y git curl docker.io docker-compose-plugin
 sudo usermod -aG docker "$USER"
 newgrp docker
 
-git clone https://github.com/<your-org>/eleven-typesense.git
+git clone https://github.com/padrisimo/eleven-typesense.git
 cd eleven-typesense
 cp .env.example .env
 ```

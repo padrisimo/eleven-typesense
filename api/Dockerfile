@@ -25,4 +25,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -q --method=GET -O- http://localhost:8000/health || exit 1
 
-CMD ["gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+CMD ["sh", "-c", "gunicorn app.main:app --workers \"${GUNICORN_WORKERS:-4}\" --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000"]

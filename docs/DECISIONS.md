@@ -167,3 +167,17 @@
 - **Reason:** The risky behaviour is idempotency, URL signing and the generation flow already verified by smoke. Mocking psycopg and Typesense would duplicate implementation details rather than catch real regressions.
 - **Alternative rejected:** A broad pytest suite with fake connections and fake search clients (high maintenance, low signal for a vertical slice) or duplicating `smoke.sh` in pytest (no extra coverage).
 - **When I would change it:** When generation or search logic grows branches worth isolating, or when CI needs a typed e2e runner; then add integration tests with a disposable database and Typesense instance.
+
+## Free-tier deployment path and `sslip.io` hostname
+
+- **Decision:** `docs/DEPLOY.md` now offers a free-tier demo: e2-micro in `us-central1`, 30 GB standard disk, 10k seeded sounds, one gunicorn worker, local audio, no embeddings and `DOMAIN=<VM_IP>.sslip.io`. The full-size paid path remains documented.
+- **Reason:** GCP's Free Program covers one e2-micro in three US regions, 30 GB-months of standard disk and 1 GB egress; the full 200k/4-worker setup would not fit 1 GB RAM. `sslip.io` gives a real DNS name for Caddy's Let's Encrypt HTTP-01 challenge without buying a domain.
+- **Alternative rejected:** Cloud Run alone (no free Postgres/Typesense), GitHub Pages as an API proxy (static hosting only, no backend or proxy), or a bare public IP (Let's Encrypt does not issue certificates for plain IPs).
+- **When I would change it:** When traffic or dataset size outgrows e2-micro, or when a real domain is available; then switch to the standard path and a branded hostname.
+
+## Serve the built UI from Caddy in production
+
+- **Decision:** The production Caddyfile serves `ui/dist` at `/`, proxies `/api/*` to FastAPI with the prefix stripped, and keeps `/health` proxied for compatibility. `docker-compose.prod.yml` mounts the built bundle read-only at `/srv`.
+- **Reason:** Same-origin UI and API avoid CORS and let one TLS endpoint serve the whole app. The UI bundle is built before `up` because the VM does not need Node installed.
+- **Alternative rejected:** Hosting the UI on GitHub Pages (would require CORS and a separate public API URL) or adding a second web server.
+- **When I would change it:** If the frontend is deployed independently to a CDN, keep only the `/api/*` proxy and add explicit CORS/origin checks.

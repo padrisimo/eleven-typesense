@@ -113,7 +113,7 @@ Keyword matching tokens ("sound", "hinge") returns generic ambience; hybrid sear
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Only Caddy publishes ports (80/443 with automatic HTTPS); set `DOMAIN`, `CADDY_EMAIL`, a strong `POSTGRES_PASSWORD` and `TYPESENSE_API_KEY` in `.env` first. The full GCP runbook (bucket, least-privilege service account, VM, firewall, backup and teardown) is in `docs/DEPLOY.md`.
+Only Caddy publishes ports (80/443 with automatic HTTPS); set `DOMAIN`, `CADDY_EMAIL`, a strong `POSTGRES_PASSWORD` and `TYPESENSE_API_KEY` in `.env` first. The full GCP runbook is in `docs/DEPLOY.md`; it includes a **free-tier demo path** (e2-micro, 10k sounds, one worker, free `sslip.io` hostname) and the standard 200k setup. A billing account is still required for GCP free tier.
 
 ## Web UI
 
@@ -132,6 +132,8 @@ npm run build   # typecheck + production bundle in ui/dist
 ```
 
 Pinned versions: React 19.3.1, Ant Design 6.7.2, Vite 8.4.0, TypeScript 5.9.3. Vite requires Node 20.19+ or 22.12+.
+
+In the production Compose stack, Caddy serves `ui/dist` at `/`, proxies `/api/*` to FastAPI and keeps `/health` for compatibility.
 
 ## Documentation
 
