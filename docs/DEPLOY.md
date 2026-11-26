@@ -63,7 +63,7 @@ Verified from the public HTTPS endpoint: `/health` and `/api/health` return `{"s
 Stop the VM when not in use; delete everything before the trial credit expires on 2026-02-25 or the account starts charging.
 
 ```bash
-export PROJECT_ID=<PROJECT_ID>
+export PROJECT_ID=your-project-id
 gcloud compute instances stop soundseek-trial --zone=us-central1-a
 gcloud compute instances delete soundseek-trial --zone=us-central1-a --quiet
 gcloud compute firewall-rules delete allow-soundseek-trial-web allow-soundseek-trial-ssh --quiet

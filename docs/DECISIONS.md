@@ -215,6 +215,6 @@
 ## Revert the demo to the mock generator
 
 - **Decision:** Set `GENERATOR=mock` again in the VM `.env` and delete the `ELEVENLABS_API_KEY` line. ElevenLabs remains implemented behind the env switch, and generated sound `200004` stays in the database as evidence that the integration works.
-- **Reason:** The shared `library/demo-sample.mp3` made every preview audible, so the original complaint was solved without a third party. The Free plan is non-commercial, and this vertical slice is judged on search/index/performance decisions rather than on realistic generation. Mock is deterministic and keeps the smoke test stable.
+- **Reason:** The shared `library/demo-sample.mp3` made every preview audible, so the original complaint was solved without a third party. The Free plan is non-commercial and this vertical slice is judged on search/index/performance decisions rather than on realistic generation. Mock is deterministic and keeps the smoke test stable.
 - **Alternative rejected:** Leaving ElevenLabs enabled for a more impressive demo — adds licensing ambiguity, third-party latency and a failure mode that is outside the scope of the slice.
-- **When I would change it:** If generation becomes a real requirement, rotate the key, set it only in the VM `.env` through `~/.elevenlabs_key`, set `GENERATOR=elevenlabs`, and move to a paid plan if the output is used commercially.
+- **When I would change it:** If generation becomes a real requirement, put a dedicated key only in the VM `.env`, set `GENERATOR=elevenlabs`, and move to a paid plan if the output is used commercially.
