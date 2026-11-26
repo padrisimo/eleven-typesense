@@ -50,7 +50,8 @@ const { Title, Text, Paragraph } = Typography;
 
 const GITHUB_URL =
   import.meta.env.VITE_GITHUB_URL ?? 'https://github.com/padrisimo/eleven-typesense';
-const EXAMPLES = ['heavy metallic door', 'creaky hinge', 'footsteps on gravel'];
+const DEFAULT_QUERY = 'explosion';
+const EXAMPLES = [DEFAULT_QUERY, 'heavy metallic door', 'creaky hinge', 'footsteps on gravel'];
 
 function facetOptions(facets: Facet[], field: string, limit = 12) {
   const facet = facets.find((item) => item.field_name === field);
@@ -66,8 +67,8 @@ function errorMessage(error: unknown, fallback: string) {
 export default function App() {
   const { message } = AntApp.useApp();
 
-  const [query, setQuery] = useState(EXAMPLES[0]);
-  const [appliedQuery, setAppliedQuery] = useState(EXAMPLES[0]);
+  const [query, setQuery] = useState(DEFAULT_QUERY);
+  const [appliedQuery, setAppliedQuery] = useState(DEFAULT_QUERY);
   const [mode, setMode] = useState<SearchMode>('keyword');
   const [category, setCategory] = useState<string | undefined>();
   const [format, setFormat] = useState<string | undefined>();
@@ -202,19 +203,13 @@ export default function App() {
         <Layout className="app-shell">
           <Header className="app-header">
             <Flex align="center" justify="space-between">
-              <Space size="middle">
+              <Space size="small">
                 <span className="logo-mark">
                   <AudioOutlined />
                 </span>
-                <span>
-                  <Text strong className="brand-name">
-                    Soundseek
-                  </Text>
-                  <br />
-                  <Text type="secondary" className="brand-subtitle">
-                    Search. Generate. Listen.
-                  </Text>
-                </span>
+                <Text strong className="brand-name">
+                  Soundseek
+                </Text>
               </Space>
               <Tooltip title="View the source on GitHub">
                 <Button
