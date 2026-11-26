@@ -1,8 +1,8 @@
-# Interview notes — measured numbers and talking points
+# Performance and design notes
 
-Environment for all numbers: Colima (4 vCPU / 8 GiB), PostgreSQL 16.16, Typesense 30.2, 200,000 reproducible sounds (`random.seed(42)`), 10 categories, 2,976 rows with `bpm`. Timings are medians of repeated runs on this laptop, not production benchmarks.
+Environment for all numbers: Colima (4 vCPU / 8 GiB), PostgreSQL 16.16, Typesense 30.2, 200,000 reproducible sounds (`random.seed(42)`), 10 categories, 2,976 rows with `bpm`. Timings are medians of repeated runs on this machine, not production benchmarks.
 
-## 1. PostgreSQL indexes: before / after (`EXPLAIN ANALYZE`, 3 runs each)
+## PostgreSQL indexes: before / after (`EXPLAIN ANALYZE`, 3 runs each)
 
 | Query | Before | After | Plan change | Buffers |
 |---|---:|---:|---|---:|
@@ -12,19 +12,19 @@ Environment for all numbers: Colima (4 vCPU / 8 GiB), PostgreSQL 16.16, Typesens
 | Q4 `GROUP BY category` count | 26.183 ms | **14.726 ms** (~1.8×) | Parallel Seq Scan + HashAggregate → Index Only Scan + GroupAggregate | 21,670 → 900 |
 | Q5 common-term `ILIKE '%explosion%' LIMIT 20` | 0.217 ms | **1.843 ms** (regression) | Seq Scan → trigram bitmap + recheck | 26 → 64 |
 
-The interesting answer is Q5: an index chosen by the cost estimator is slower for a very common substring with an early `LIMIT`, because the sequential scan stops after a few pages. I kept it in the report rather than hiding it. Index build took **1.46 s** for 7 indexes plus `pg_trgm`; the full table is 200k rows.
+The interesting result is Q5: an index chosen by the cost estimator is slower for a very common substring with an early `LIMIT`, because the sequential scan stops after a few pages. The regression is kept in the report rather than hidden. Index build took **1.46 s** for 7 indexes plus `pg_trgm`; the table has 200k rows.
 
-Text search comparison: Postgres `ILIKE` is faster for a literal substring with `LIMIT 20` (0.217–1.843 ms), but gives no ranking, typo tolerance or facets. Typesense `q=explosion` took a median **15 ms** with `found=23,331` and four facets; `q=rusty hatch` took **6 ms** with `found=1,139` because tokens match across weighted fields (quoted phrase → 760 hits in 23 ms). Postgres stays the source of truth; Typesense stays the search API.
+Text search comparison: Postgres `ILIKE` is faster for a literal substring with `LIMIT 20` (0.217–1.843 ms), but gives no ranking, typo tolerance or facets. Typesense `q=explosion` took a median **15 ms** with `found=23,331` and four facets; `q=rusty hatch` took **6 ms** with `found=1,139` because tokens match across weighted fields (quoted phrase → 760 hits in 23 ms). Postgres remains the source of truth; Typesense remains the search API.
 
-## 2. Source of truth, derived index and zero-downtime swaps
+## Data flow and index synchronization
 
 - Postgres owns metadata, jobs, quota and `indexed_at`; Typesense is derived and rebuildable from it with `scripts/reindex.py`.
-- Generation commits to Postgres first, then upserts to Typesense. If the index is down, `indexed_at` stays NULL and `--only-unindexed` repairs it. This is a minimal outbox marker, not a durable queue — but it is enough to find and fix gaps.
+- Generation commits to Postgres first, then upserts to Typesense. If the index is down, `indexed_at` stays NULL and `--only-unindexed` repairs it. This is a minimal outbox marker, not a durable queue — enough to find and fix gaps.
 - Collections are versioned (`sounds_v1`, `sounds_v2`) behind the `sounds` alias. The API never hardcodes a collection name; `--only-alias` flips the alias in one atomic `upsert`, with the old collection still available for rollback. No restart, no downtime.
-- Phase 2 keyword measurements on 200k docs: `explosion` 40 ms / 23,331 found; `footsteps` + filters 51 ms / 1,870 found; nonsense query 0 ms / `suggest_generate=true`.
-- Phase 5: `sounds_v2` auto-embeds `title + description` with Typesense's built-in `ts/all-MiniLM-L12-v2` (384 dims, cosine). Only 10k docs are embedded because CPU inference is slow; a production backfill would use workers/GPU.
+- Keyword measurements on 200k docs: `explosion` 40 ms / 23,331 found; `footsteps` + filters 51 ms / 1,870 found; nonsense query 0 ms / `suggest_generate=true`.
+- `sounds_v2` auto-embeds `title + description` with Typesense's built-in `ts/all-MiniLM-L12-v2` (384 dims, cosine). Only 10k docs are embedded because CPU inference is slow; a production backfill would use workers/GPU.
 
-## 3. Generation, idempotency and cost control
+## Generation: idempotency and cost control
 
 - `POST /generate` holds a Postgres advisory lock on `sha256(prompt.strip())` for the whole synchronous flow; two identical concurrent requests produce one sound.
 - An idempotent hit returns the existing sound without calling the provider and without consuming quota.
@@ -33,27 +33,25 @@ Text search comparison: Postgres `ILIKE` is faster for a literal substring with 
 - Verified: two identical calls → same `sound_id`, second `idempotent: true`; with limit 1 a new prompt returns **429** while the old prompt still returns its cached sound.
 - ElevenLabs uses the official `POST https://api.elevenlabs.io/v1/sound-generation` (`xi-api-key`, `text`, `duration_seconds` 0.5–30, `output_format`). On 401/402/403 with fallback enabled it uses the mock and stores `license='mock'` rather than claiming a commercial license for free-tier audio.
 
-## 4. Signed URLs and access control
+## Signed URLs and access control
 
 - `GET /sounds/{id}` reads Postgres; `/preview` returns a 30-second URL; `/download` requires `X-Subscriber: true` and returns a 5-minute URL.
 - Local backend: HMAC over `key:expires`, verified by `/audio/{key}`; path traversal is blocked with `Path.is_relative_to`. Verified **403** without header, **200 audio/mpeg** with it.
 - GCS backend: V4 signed URLs through IAM `signBlob` with the attached service account — no private key on disk (Google's own docs discourage downloading one). Requires `roles/iam.serviceAccountTokenCreator` on the app service account.
-- `X-Subscriber` is explicitly an auth stub; in production it would be a verified session/subscription token at the edge and in the API.
+- `X-Subscriber` is an explicit stub: real deployments validate a session/subscription token at the edge and in the API.
 
-## 5. Why a VM + Compose, and what changes as it grows
+## Deployment shape and scaling path
 
-- A single Debian VM with Compose matches the target stack and is easy to explain: Caddy on `edge`, API + Postgres + Typesense on `backend`, named volumes for data, healthchecks and log rotation. Only Caddy publishes 80/443.
+- A single Debian VM with Compose matches the target stack: Caddy on `edge`, API + Postgres + Typesense on `backend`, named volumes for data, healthchecks and log rotation. Only Caddy publishes 80/443.
 - Verified production stack: `https://localhost/health` → `{"status":"ok","database":"connected"}`, HTTP → **308** redirect, hybrid search through Caddy → `Creaking Door Closing` as top hit.
 - As it grows: Cloud Run for stateless API replicas, Cloud SQL for Postgres (PITR, automated backups), a managed queue/worker for generation and reindexing, PgBouncer if connection counts become the bottleneck (not needed at 4 workers), and structured logging/metrics/tracing instead of `docker compose logs`.
 - Embeddings and generation are the first things to move out of the request path: CPU inference and third-party latency do not belong in a synchronous web worker at scale.
 
-## 6. Practice code vs production
+## Current scope vs production
 
-Practice code: demo credentials in Compose, synchronous generation, HMAC/auth stubs, mock generator, single-node Typesense, logical backups, 10k embedding subset, no rate limiting per user, no monitoring/alerting.
+The current implementation deliberately keeps simple credentials, synchronous generation, HMAC/auth stubs, a mock generator, single-node Typesense, logical backups, a 10k embedding subset, no per-user rate limiting and no monitoring/alerting. Production would add real identity and subscription checks, secrets in Secret Manager, queues with retries and dead-letter handling, per-user quotas, a full embedding backfill, Postgres PITR, multi-node Typesense with snapshots, observability and cost alerts. The parts worth keeping are the interfaces (`Storage`, `SoundGenerator`), the versioned alias and the `indexed_at` gap detector — they are the seams where those production pieces plug in.
 
-Production would need: real identity and subscription checks, secrets in Secret Manager, queues with retries and dead-letter handling, per-user quotas, a full embedding backfill, Postgres PITR, multi-node Typesense with snapshots, observability and cost alerts. The parts worth keeping are the interfaces (`Storage`, `SoundGenerator`), the versioned alias and the `indexed_at` gap detector — they are the seams where those production pieces plug in.
-
-## Measured semantic-vs-keyword demo (Phase 5, medians of 5 runs)
+## Semantic vs keyword search (medians of 5 runs)
 
 Query: `sound of a creaky hinge` against the 10k-doc `sounds_v2`.
 

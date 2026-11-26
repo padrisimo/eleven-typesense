@@ -1,4 +1,4 @@
-# mini-Soundsnap
+# Soundseek
 
 Sound effects search engine. PostgreSQL is the source of truth; Typesense is a derived search index. When search returns nothing good, the API can generate a new sound (mock by default, ElevenLabs behind a flag), store it and make it searchable.
 
@@ -21,7 +21,7 @@ The seed loads 200,000 reproducible rows (`random.seed(42)`). The reindex bulk-i
 - `GET /sounds/{id}`, `/sounds/{id}/preview`, `/sounds/{id}/download`
 - `POST /generate {prompt, duration_seconds?}`
 
-## Example searches (Phase 2, measured)
+## Example searches (measured)
 
 All queries ran against 200,000 indexed documents on Typesense 30.2 (Colima, 4 vCPU/8 GiB), with weights `title:3, tags:2, description:1`.
 
@@ -70,7 +70,7 @@ curl 'http://localhost:8000/search?q=xyzzynonexistent'
 }
 ```
 
-## Generation and signed URLs (Phase 4, verified)
+## Generation and signed URLs (verified)
 
 ```bash
 curl -s -X POST http://localhost:8000/generate \
@@ -88,7 +88,7 @@ The same prompt again returns the same `sound_id` with `idempotent: true` and cr
 
 Run the end-to-end smoke test with `./scripts/smoke.sh`.
 
-## Hybrid search and alias swap (Phase 5, verified)
+## Hybrid search and alias swap (verified)
 
 ```bash
 docker compose exec api python /scripts/reindex.py --collection sounds_v2 --with-embeddings --limit 10000 --dsn postgresql://soundsnap:soundsnap@db:5432/soundsnap
@@ -119,9 +119,9 @@ Only Caddy publishes ports (80/443 with automatic HTTPS); set `DOMAIN`, `CADDY_E
 
 - `docs/ARCHITECTURE.md` — architecture diagram and write/search paths
 - `docs/DECISIONS.md` — decisions and rejected alternatives
-- `docs/EXPLAIN_REPORT.md` — Postgres before/after indexes (Phase 3)
+- `docs/EXPLAIN_REPORT.md` — Postgres before/after indexes
 - `docs/DEPLOY.md` — GCP VM + Compose runbook
-- `docs/INTERVIEW_NOTES.md` — talking points with measured numbers
+- `docs/PERFORMANCE.md` — measured performance and design notes
 
 ## Development
 

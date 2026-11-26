@@ -1,5 +1,5 @@
 [project]
-name = "soundsnap-api"
+name = "soundseek-api"
 version = "0.1.0"
 description = "Sound effects search API"
 readme = "README.md"

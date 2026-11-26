@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Soundsnap API",
+        title="Soundseek API",
         version="0.1.0",
         lifespan=lifespan,
     )

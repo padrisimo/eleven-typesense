@@ -10,11 +10,11 @@ Run these in your shell and keep them for the teardown block:
 export PROJECT_ID=my-gcp-project
 export REGION=europe-west1
 export ZONE=europe-west1-b
-export VM_NAME=soundsnap
-export BUCKET=my-soundsnap-audio
-export SA_NAME=soundsnap-app
+export VM_NAME=soundseek
+export BUCKET=my-soundseek-audio
+export SA_NAME=soundseek-app
 export SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
-export DOMAIN=soundsnap.example.com
+export DOMAIN=soundseek.example.com
 export MY_IP=$(curl -s https://ifconfig.me)
 
 gcloud config set project "$PROJECT_ID"
@@ -29,7 +29,7 @@ The VM has no JSON key on disk. It uses its attached service account via Applica
 gcloud storage buckets create "gs://$BUCKET" --location="$REGION" --uniform-bucket-level-access
 
 gcloud iam service-accounts create "$SA_NAME" \
-  --display-name="mini-Soundsnap app"
+  --display-name="Soundseek app"
 
 gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" \
   --member="serviceAccount:$SA_EMAIL" \
@@ -54,18 +54,18 @@ gcloud compute instances create "$VM_NAME" \
   --image-project=debian-cloud \
   --service-account="$SA_EMAIL" \
   --scopes=https://www.googleapis.com/auth/cloud-platform \
-  --tags=soundsnap
+  --tags=soundseek
 
-gcloud compute firewall-rules create allow-soundsnap-web \
+gcloud compute firewall-rules create allow-soundseek-web \
   --network=default \
   --allow=tcp:80,tcp:443 \
-  --target-tags=soundsnap
+  --target-tags=soundseek
 
-gcloud compute firewall-rules create allow-soundsnap-ssh \
+gcloud compute firewall-rules create allow-soundseek-ssh \
   --network=default \
   --allow=tcp:22 \
   --source-ranges="$MY_IP/32" \
-  --target-tags=soundsnap
+  --target-tags=soundseek
 ```
 
 Caddy needs port 80 for the ACME HTTP-01 challenge and redirects it to HTTPS. SSH is restricted to your IP.
@@ -96,10 +96,10 @@ POSTGRES_PASSWORD=<random-alphanumeric>
 TYPESENSE_API_KEY=<random-string>
 LOCAL_SIGNING_SECRET=<random-string>
 STORAGE_BACKEND=gcs
-GCS_BUCKET=my-soundsnap-audio
+GCS_BUCKET=my-soundseek-audio
 GCS_PROJECT_ID=my-gcp-project
-GCS_SIGNER_SERVICE_ACCOUNT=soundsnap-app@my-gcp-project.iam.gserviceaccount.com
-DOMAIN=soundsnap.example.com
+GCS_SIGNER_SERVICE_ACCOUNT=soundseek-app@my-gcp-project.iam.gserviceaccount.com
+DOMAIN=soundseek.example.com
 CADDY_EMAIL=admin@example.com
 GENERATOR=mock
 ELEVENLABS_API_KEY=
@@ -116,7 +116,7 @@ $DC up -d --build
 $DC exec api python /db/seed.py --dsn "$DSN"
 $DC exec api python /scripts/reindex.py --dsn "$DSN" --set-alias
 
-# Optional Phase 5: semantic index (CPU inference is slow, hence the limit)
+# Optional: semantic index (CPU inference is slow, hence the limit)
 $DC exec api python /scripts/reindex.py --collection sounds_v2 --with-embeddings --limit 10000 --dsn "$DSN"
 $DC exec api python /scripts/reindex.py --collection sounds_v2 --only-alias
 
@@ -132,7 +132,7 @@ Only Caddy publishes ports: `80`, `443` and `443/udp`. Postgres, Typesense and t
 $DC exec api python /scripts/reindex.py --only-unindexed --dsn "$DSN"
 
 # Logical backup (VM disk snapshots are a separate mechanism)
-$DC exec -T db pg_dump -U soundsnap -Fc soundsnap > "soundsnap-$(date +%F).dump"
+$DC exec -T db pg_dump -U soundsnap -Fc soundsnap > "soundseek-$(date +%F).dump"
 
 # Roll back a bad alias switch
 $DC exec api python /scripts/reindex.py --collection sounds_v1 --only-alias
@@ -144,7 +144,7 @@ There is no point-in-time recovery on a self-managed VM: logical dumps and disk 
 
 ```bash
 gcloud compute instances delete "$VM_NAME" --zone="$ZONE" --quiet
-gcloud compute firewall-rules delete allow-soundsnap-web allow-soundsnap-ssh --quiet
+gcloud compute firewall-rules delete allow-soundseek-web allow-soundseek-ssh --quiet
 gcloud storage rm -r "gs://$BUCKET"
 gcloud iam service-accounts delete "$SA_EMAIL" --quiet
 ```
