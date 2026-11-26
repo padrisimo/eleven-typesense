@@ -160,3 +160,10 @@
 - **Reason:** Ant Design gives a polished search/filter/modal UI without custom component work, and the proxy avoids adding CORS middleware to a small API only for development.
 - **Alternative rejected:** Plain CSS components (more code for the same result), server-rendered templates (poorer interaction), or direct cross-origin calls (would require new API middleware).
 - **When I would change it:** If the UI ships to production, add a Caddy `handle /api/*` rewrite or serve the built assets behind the same origin; for a larger app, consider route/code splitting to reduce the current 825 kB bundle.
+
+## Minimal unit tests, smoke test kept as the e2e suite
+
+- **Decision:** `api/tests/test_unit.py` covers only pure functions with no database or network; `scripts/smoke.sh` remains the end-to-end check against the running stack.
+- **Reason:** The risky behaviour is idempotency, URL signing and the generation flow already verified by smoke. Mocking psycopg and Typesense would duplicate implementation details rather than catch real regressions.
+- **Alternative rejected:** A broad pytest suite with fake connections and fake search clients (high maintenance, low signal for a vertical slice) or duplicating `smoke.sh` in pytest (no extra coverage).
+- **When I would change it:** When generation or search logic grows branches worth isolating, or when CI needs a typed e2e runner; then add integration tests with a disposable database and Typesense instance.

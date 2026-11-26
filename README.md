@@ -145,4 +145,15 @@ Pinned versions: React 19.3.1, Ant Design 6.7.2, Vite 8.4.0, TypeScript 5.9.3. V
 
 Docker Compose reads `docker-compose.override.yml` automatically: db, Typesense and API publish to `127.0.0.1` only, and the API hot-reloads from `./api`. Run scripts inside the API container so they use the pinned Python 3.12 environment.
 
-Use `uv` for local linting (Python 3.12): `uv run --python 3.12 ruff check api/ scripts/ db/`.
+Use `uv` for local linting (Python 3.12): `uv run --python 3.12 ruff check api/app api/tests scripts db/`.
+
+## Tests
+
+Unit tests cover pure functions only (prompt hashing, format mapping, request validation, local URL signing and the mock generator). Run them from `api/`:
+
+```bash
+cd api
+uv run --python 3.12 --extra dev pytest -q
+```
+
+The end-to-end test is `./scripts/smoke.sh` from the repository root, against a running dev stack. It checks health, search, idempotent generation and that the generated sound is searchable.

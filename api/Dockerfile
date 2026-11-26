@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY pyproject.toml ./
+COPY app ./app
+COPY assets ./assets
 RUN pip install --no-cache-dir -e .
 
 COPY . .
