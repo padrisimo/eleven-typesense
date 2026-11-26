@@ -188,3 +188,10 @@
 - **Reason:** The credit covers roughly 50 EUR/month for three months, and the remote run validates GCS `signBlob`, Caddy TLS via `sslip.io`, alias switching and hybrid search — none of which can be exercised locally. The vertical slice stays the goal, so the scope is time-bounded rather than permanent.
 - **Alternative rejected:** Leaving the larger VM always on until the credit expires (surprise bill afterwards), reusing `My First Project` (immutable long ID and messy teardown), making the repo public only to unblock the VM clone (the source was copied via tarball instead; the user later made it public anyway), Cloud Run/GKE (outside the target stack).
 - **When I would change it:** If the demo must stay public after February, get explicit approval for a paid budget and a real domain; if traffic or data grows, follow the Cloud SQL/queue path in `docs/ARCHITECTURE.md`.
+
+## Keep Typesense for search; ElevenLabs stays generation-only
+
+- **Decision:** Do not integrate ElevenLabs as a sound-search source. Search remains Typesense hybrid (`query_by=embedding,title,tags,description`) with its bundled model; ElevenLabs is only an optional `SoundGenerator` implementation.
+- **Reason:** The official OpenAPI spec has no sound-effect search endpoint — only `POST /v1/sound-generation`; `/v1/assets` covers the caller's own workspace files. The curated effects library is browsable on the website but has no public API, and the free plan is non-commercial. Typesense already provides semantic search with no external calls or cost.
+- **Alternative rejected:** Scraping the ElevenLabs web library (unofficial, brittle, licensing risk), adding Freesound (external service outside the target stack and needs an API key), or paying for credits to generate audio when the request was for search.
+- **When I would change it:** If ElevenLabs publishes an officially supported SFX search/library API with clear commercial licensing, or a real external catalog becomes a core requirement; then add it as another source behind the existing search/storage seams.
