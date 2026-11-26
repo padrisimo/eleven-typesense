@@ -86,8 +86,13 @@ body {
 }
 
 .search-bar .ant-input-affix-wrapper {
-  padding: 10px 14px;
+  height: 40px;
+  padding: 0 14px;
   font-size: 16px;
+}
+
+.search-bar .ant-btn {
+  height: 40px;
 }
 
 .hero-row {
@@ -179,6 +184,13 @@ body {
 
   .search-bar {
     flex-direction: column;
+    gap: 12px;
+  }
+
+  .search-bar .ant-input-affix-wrapper,
+  .search-bar .ant-btn {
+    margin: 0 !important;
+    border-radius: 8px !important;
   }
 
   .search-bar .ant-btn {
