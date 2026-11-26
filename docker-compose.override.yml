@@ -15,4 +15,5 @@ services:
     volumes:
       - ./api:/app
       - ./db:/db:ro
+      - ./scripts:/scripts:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

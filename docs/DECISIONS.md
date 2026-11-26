@@ -41,3 +41,24 @@
 - **Reason:** 200k individual `INSERT`s would be too slow; a fixed timestamp would make the Phase 3 "filter by category + order by date" benchmark meaningless.
 - **Alternative rejected:** Generating a CSV on the host and `\copy` — an extra intermediate file and a second toolchain (host Python) to maintain.
 - **When I would change it:** If the dataset grows past a few million rows, generate partitioned files and parallel `COPY` workers.
+
+## Versioned collection + alias, batch import with `upsert` (Phase 2)
+
+- **Decision:** Index into `sounds_v1` and query the alias `sounds`; `scripts/reindex.py` imports in 500-document JSONL batches with `action=upsert` and marks `indexed_at` in Postgres.
+- **Reason:** Aliases let Phase 5 switch collections atomically with no client change; `upsert` makes re-running the reindex idempotent; batches keep memory bounded.
+- **Alternative rejected:** Indexing straight into a fixed `sounds` collection one document at a time — no alias swap, and 200k HTTP calls would be far slower.
+- **When I would change it:** If the corpus grows past ~10M documents, shard into multiple collections and use multi-search.
+
+## `created_at` indexed as Unix `int64` (Phase 2)
+
+- **Decision:** Store `created_at` as `int64` (Unix seconds) in Typesense, with `default_sorting_field` set to it.
+- **Reason:** Typesense 30.2 has no native `datetime` field type; an integer epoch sorts chronologically and works in range filters.
+- **Alternative rejected:** Indexing the ISO-8601 string — lexical sorting works for UTC but range filters become brittle.
+- **When I would change it:** If Typesense adds a datetime type, switch and reindex.
+
+## `query_by` weights `title:3, tags:2, description:1` (Phase 2)
+
+- **Decision:** Rank title matches highest, then tags, then description; sort by `_text_match:desc,created_at:desc`.
+- **Reason:** Sound-effect searches are mostly by short name/tag; description is verbose and noisy. Tie-breaking by recency gives stable results.
+- **Alternative rejected:** Equal weights — generic words in descriptions dominate top hits.
+- **When I would change it:** After collecting real user clicks, tune weights or add curated rules.
