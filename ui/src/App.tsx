@@ -49,7 +49,7 @@ const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
 const GITHUB_URL =
-  import.meta.env.VITE_GITHUB_URL ?? 'https://github.com/padrisimo/eleven-typesense';
+  import.meta.env.VITE_GITHUB_URL ?? 'https://github.com/padrisimo/soundseek';
 const DEFAULT_QUERY = 'explosion';
 const EXAMPLES = [DEFAULT_QUERY, 'heavy metallic door', 'creaky hinge', 'footsteps on gravel'];
 
