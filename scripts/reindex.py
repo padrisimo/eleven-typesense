@@ -22,10 +22,10 @@ def create_collection(client, name: str, with_embeddings: bool):
         schema["fields"] = list(schema["fields"]) + [
             {
                 "name": "embedding",
-                "type": "float32[]",
+                "type": "float[]",
                 "embed": {
                     "from": ["title", "description"],
-                    "model_name": "ts/all-MiniLM-L12-v2",
+                    "model_config": {"model_name": "ts/all-MiniLM-L12-v2"},
                 },
             }
         ]
@@ -116,6 +116,7 @@ def main():
     parser.add_argument("--limit", type=int)
     parser.add_argument("--only-unindexed", action="store_true")
     parser.add_argument("--set-alias", action="store_true")
+    parser.add_argument("--only-alias", action="store_true")
     parser.add_argument(
         "--dsn",
         default=os.getenv(
@@ -126,6 +127,9 @@ def main():
     args = parser.parse_args()
 
     client = get_typesense_client()
+    if args.only_alias:
+        set_alias(client, args.collection)
+        return
     create_collection(client, args.collection, args.with_embeddings)
     ids = index_sounds(args.dsn, client, args.collection, args.limit, args.only_unindexed)
     mark_indexed(args.dsn, ids)

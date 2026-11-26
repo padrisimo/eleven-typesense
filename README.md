@@ -88,6 +88,25 @@ The same prompt again returns the same `sound_id` with `idempotent: true` and cr
 
 Run the end-to-end smoke test with `./scripts/smoke.sh`.
 
+## Hybrid search and alias swap (Phase 5, verified)
+
+```bash
+docker compose exec api python /scripts/reindex.py --collection sounds_v2 --with-embeddings --limit 10000 --dsn postgresql://soundsnap:soundsnap@db:5432/soundsnap
+docker compose exec api python /scripts/reindex.py --collection sounds_v2 --only-alias
+curl 'http://localhost:8000/search?q=sound%20of%20a%20creaky%20hinge&mode=hybrid'
+```
+
+`sounds_v2` adds an auto-embedding field built from `title + description` with Typesense's built-in `ts/all-MiniLM-L12-v2` model (384 dims). The alias `sounds` is switched atomically with a single `upsert`; the API always queries the alias, so no restart or downtime is needed. For the demo only 10,000 documents are embedded (CPU inference is slow); generated sounds are upserted into the active collection and get an embedding automatically.
+
+Measured medians of 5 runs (same query, top 5 titles):
+
+| mode | found | median ms | top hits |
+|---|---:|---:|---|
+| `keyword` | 2456 | 7 | Tense Soundscape Space, Heavy Gate Knocking, Heavy Door Revolving, … |
+| `hybrid` | 2520 | 14 | **Creaking Door Closing, Creaking Entrance Locking, Walking Steps Creaking**, … |
+
+Keyword matching tokens ("sound", "hinge") returns generic ambience; hybrid search surfaces actual creaking-door effects. Filters and facets work unchanged in hybrid mode.
+
 ## Documentation
 
 - `docs/ARCHITECTURE.md` — architecture diagram (Phase 6)

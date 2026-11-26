@@ -125,3 +125,17 @@
 - **Reason:** Sound-effect searches are mostly by short name/tag; description is verbose and noisy. Tie-breaking by recency gives stable results.
 - **Alternative rejected:** Equal weights — generic words in descriptions dominate top hits.
 - **When I would change it:** After collecting real user clicks, tune weights or add curated rules.
+
+## Versioned collection with auto-embeddings and atomic alias switch (Phase 5)
+
+- **Decision:** `sounds_v2` adds an auto-embedding `float[]` field built from `title + description` with the built-in `ts/all-MiniLM-L12-v2` model (384 dims, cosine distance). Hybrid queries put `embedding` into `query_by` with weights `1,3,2,1` and `vector_query=embedding:([], k:100)`; the API always queries the `sounds` alias, switched with a single `aliases.upsert`.
+- **Reason:** A new schema can be built and validated offline, then published atomically without downtime or code changes. Official Typesense 30.2 docs use `embed.model_config.model_name` and `query_by: "embedding,<keyword fields>"` for hybrid search.
+- **Alternative rejected:** An in-place schema change (no rollback path) or an API-side model call (extra dependency and latency). The earlier draft used `float32[]` and a bare `model_name`; the pinned docs require `float[]` and `model_config`.
+- **When I would change it:** With a GPU worker or a hosted embedding API, index all documents instead of the CPU-limited 10k subset and switch models via a new collection version.
+
+## Limited 10k embedding subset for the demo (Phase 5)
+
+- **Decision:** Only the first 10,000 active sounds are embedded into `sounds_v2`; Postgres still holds 200,000+, and generated sounds are upserted into the active collection individually.
+- **Reason:** CPU inference is slow; the vertical slice needs a measurable semantic-vs-keyword comparison, not a full production backfill.
+- **Alternative rejected:** Embedding all 200k on CPU (too slow for the time budget) or leaving v1 active (no semantic search).
+- **When I would change it:** In production, backfill all documents with a batch/GPU worker and monitor index coverage; keep the same alias-swap mechanism.

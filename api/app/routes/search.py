@@ -43,7 +43,10 @@ async def search(
         "highlight_fields": "title,description",
     }
     if mode == "hybrid":
+        params["query_by"] = "embedding,title,tags,description"
+        params["query_by_weights"] = "1,3,2,1"
         params["vector_query"] = "embedding:([], k:100)"
+        params["exclude_fields"] = "embedding"
 
     client = get_typesense_client()
     result = client.collections[COLLECTION].documents.search(params)
