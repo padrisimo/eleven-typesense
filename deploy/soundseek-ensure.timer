@@ -1,0 +1,11 @@
+[Unit]
+Description=Reconcile the Soundseek stack every five minutes
+
+[Timer]
+OnBootSec=30sec
+OnUnitActiveSec=5min
+AccuracySec=30sec
+Unit=soundseek-ensure.service
+
+[Install]
+WantedBy=timers.target

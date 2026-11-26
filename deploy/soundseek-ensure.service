@@ -1,0 +1,9 @@
+[Unit]
+Description=Reconcile the Soundseek Compose stack
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/adrian/eleven-typesense
+ExecStart=/home/adrian/eleven-typesense/scripts/ensure-up.sh

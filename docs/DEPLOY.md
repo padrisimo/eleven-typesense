@@ -58,6 +58,26 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T api
 
 Verified from the public HTTPS endpoint: `/health` and `/api/health` return `{"status":"ok","database":"connected"}`, `/` serves `<title>Soundseek</title>`, `q=door` returns 833 hits in 7 ms, `mode=hybrid` with `heavy metallic door sound` returns 586 hits in 19 ms, two identical `/generate` calls return the same `sound_id` with `idempotent: true` on the second, the GCS signed preview URL returns **200 audio/mpeg** (17,180 bytes), `/download` returns **403** without `X-Subscriber: true`, and the generated sound is searchable. Full numbers are in `docs/PERFORMANCE.md`.
 
+### Keeping the stack up (the Compose answer to a K8s controller)
+
+`restart: unless-stopped` in Compose restarts crashed containers, and GCP can restart the VM after a host failure. Compose does not reconcile drift or restart a container that is `up` but unhealthy, so add a small systemd timer that runs `scripts/ensure-up.sh`: it calls `docker compose up -d` (recreating anything missing or stopped) and restarts containers whose health status is `unhealthy`.
+
+```bash
+sudo systemctl enable docker
+gcloud compute instances set-scheduling soundseek-trial --zone=us-central1-a \
+  --restart-on-failure --maintenance-policy=MIGRATE
+
+sudo cp ~/eleven-typesense/deploy/soundseek-ensure.service \
+       ~/eleven-typesense/deploy/soundseek-ensure.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now soundseek-ensure.timer
+systemctl list-timers soundseek-ensure.timer
+sudo systemctl start soundseek-ensure.service
+sudo journalctl -u soundseek-ensure.service -n 20
+```
+
+The timer fires 30 s after boot and every 5 minutes. Finally, add a Cloud Monitoring uptime check on `https://<VM_IP>.sslip.io/health` with an email alert: Docker and GCP handle restarts, the alert tells you when a human is needed. This is intentionally simpler than Kubernetes — no scheduler, no rescheduling across nodes, no autoscaling; for those, move the API to Cloud Run or GKE.
+
 ### Trial teardown (irreversible)
 
 Stop the VM when not in use; delete everything before the trial credit expires on 2026-02-25 or the account starts charging.
