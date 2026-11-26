@@ -28,12 +28,33 @@
 - **Alternative rejected:** A separate `/ready` endpoint — overkill for a vertical slice.
 - **When I would change it:** If we add more dependencies (queue, GCS), split liveness/readiness properly.
 
-## `indexes.sql` is not mounted into initdb (Phase 1)
+## `indexes.sql` mounted into initdb only after Phase 3
 
-- **Decision:** Only `schema.sql` is mounted in `docker-entrypoint-initdb.d`; `indexes.sql` is applied manually in Phase 3.
-- **Reason:** Phase 3 measures `EXPLAIN (ANALYZE, BUFFERS)` before and after creating indexes. Mounting both would remove the "before" state and invalidate the report.
-- **Alternative rejected:** Applying indexes at startup and measuring with a temporary index drop — riskier and less reproducible.
-- **When I would change it:** After Phase 3, once the report is recorded, mount both files so a clean clone has the final schema.
+- **Decision:** During Phases 1–2 only `schema.sql` was mounted; after recording the benchmark, `indexes.sql` was added back as `02-indexes.sql` so a clean clone gets the final schema.
+- **Reason:** Phase 3 needed a real "before" state without secondary indexes. Once `docs/EXPLAIN_REPORT.md` captured the numbers, clean clones should start with the tuned schema.
+- **Alternative rejected:** Keeping indexes unmounted forever and requiring a manual step after every clone — easy to forget and breaks the definition of done.
+- **When I would change it:** If we benchmark again, temporarily drop indexes in a scratch database rather than changing the default compose mounts.
+
+## Partial indexes with `WHERE is_active` (Phase 3)
+
+- **Decision:** All secondary indexes on `sounds` are partial on `is_active`.
+- **Reason:** The search API only returns active sounds, so inactive rows would only add index size and maintenance cost.
+- **Alternative rejected:** Full indexes including inactive rows — larger and slower to update for no query benefit here.
+- **When I would change it:** If an admin endpoint needs to query inactive sounds regularly, add a separate index or drop the predicate.
+
+## Keep `pg_trgm` despite a common-term regression (Phase 3)
+
+- **Decision:** Keep the GIN trigram index on `title` even though `ILIKE '%explosion%' LIMIT 20` got slower (0.217 → 1.843 ms).
+- **Reason:** Selective patterns benefit (`%rusty hatch%`: 5.289 → 1.055 ms); the regression is limited to very common substrings where a seq scan can stop after a few pages.
+- **Alternative rejected:** Dropping the index based on that single common-term case — it would remove the win for realistic selective searches.
+- **When I would change it:** If production telemetry shows most text queries are common short terms, tune the index (or add a full-text index) based on measured latency.
+
+## Benchmark with 3 runs and buffer counts (Phase 3)
+
+- **Decision:** Report medians of 3 `EXPLAIN (ANALYZE, BUFFERS)` runs plus shared-buffer page counts instead of a single execution time.
+- **Reason:** `shared_buffers=128MB` cannot hold the 200k-row table (~21k pages); single runs varied up to 4× depending on cache state, while buffer counts were stable.
+- **Alternative rejected:** A single warm run — too noisy to support a before/after claim.
+- **When I would change it:** On dedicated hardware with the dataset fully cached, fewer runs may be enough; still keep buffer counts.
 
 ## Reproducible seed with `COPY` and varied `created_at` (Phase 1)
 

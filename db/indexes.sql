@@ -21,11 +21,11 @@ CREATE INDEX IF NOT EXISTS idx_sounds_format
     ON sounds (format)
     WHERE is_active;
 
--- Optional: pg_trgm index for ILIKE on title (requires extension)
--- CREATE EXTENSION IF NOT EXISTS pg_trgm;
--- CREATE INDEX IF NOT EXISTS idx_sounds_title_trgm
---     ON sounds USING GIN (title gin_trgm_ops)
---     WHERE is_active;
+-- Trigram index for ILIKE on title (supports non-left-anchored patterns)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_sounds_title_trgm
+    ON sounds USING GIN (title gin_trgm_ops)
+    WHERE is_active;
 
 -- Index for generation_jobs lookups by prompt_hash (idempotency)
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_prompt_hash
