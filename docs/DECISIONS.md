@@ -181,3 +181,10 @@
 - **Reason:** Same-origin UI and API avoid CORS and let one TLS endpoint serve the whole app. The UI bundle is built before `up` because the VM does not need Node installed.
 - **Alternative rejected:** Hosting the UI on GitHub Pages (would require CORS and a separate public API URL) or adding a second web server.
 - **When I would change it:** If the frontend is deployed independently to a CDN, keep only the `/api/*` proxy and add explicit CORS/origin checks.
+
+## Trial deployment: bounded ambitious plan in a dedicated project
+
+- **Decision:** Use the €300 trial credit to run `<PROJECT_ID>` with an e2-standard-2 VM, 200k sounds, GCS audio and 10k embeddings, a 50 EUR budget alert and teardown before 2026-02-25. The free-tier path stays the documented default.
+- **Reason:** The credit covers roughly 50 EUR/month for three months, and the remote run validates GCS `signBlob`, Caddy TLS via `sslip.io`, alias switching and hybrid search — none of which can be exercised locally. The vertical slice stays the goal, so the scope is time-bounded rather than permanent.
+- **Alternative rejected:** Leaving the larger VM always on until the credit expires (surprise bill afterwards), reusing `My First Project` (immutable long ID and messy teardown), making the private GitHub repo public just to clone on the VM (source copied via tarball instead), Cloud Run/GKE (outside the target stack).
+- **When I would change it:** If the demo must stay public after February, get explicit approval for a paid budget and a real domain; if traffic or data grows, follow the Cloud SQL/queue path in `docs/ARCHITECTURE.md`.

@@ -1,6 +1,79 @@
 # Deploy runbook — GCP VM + Docker Compose
 
-This is a runbook, not an executed deployment. No `gcloud` command was run while building this project. Estimated cost is a single small VM plus a regional bucket; stop or tear down when finished.
+This runbook describes two paths. The **executed trial deployment** below was actually created and verified on 2026-11-26 with the €300 trial credit. The free-tier path after it is the $0-within-quotas recipe and was not executed.
+
+## Executed trial deployment (200k sounds, GCS, embeddings)
+
+Resources created in project `<PROJECT_ID>` (display name *Soundseek Trial*) on billing account `<BILLING_ACCOUNT_ID>`:
+
+| Resource | Value |
+|---|---|
+| VM | `soundseek-trial`, `us-central1-a`, `e2-standard-2` (2 vCPU / 8 GiB), 50 GB `pd-balanced`, Debian 12 |
+| Service account | `<SA_EMAIL>` |
+| IAM | SA has `roles/storage.objectAdmin` on the bucket and `roles/iam.serviceAccountTokenCreator` on itself for V4 `signBlob` |
+| Bucket | `gs://<BUCKET_NAME>`, `us-central1`, uniform bucket-level access |
+| Firewall | `allow-soundseek-trial-web` (80/443), `allow-soundseek-trial-ssh` (22 from the operator IP only) |
+| Budget | 50 EUR, filtered to the project, alerts at 50/90/100 % (`<BUDGET_ID>`) |
+| DNS | `<VM_IP>.sslip.io`, real Let's Encrypt certificate issued by Caddy |
+
+`gcloud` on the operator machine is pinned to the uv-managed Python 3.12 via `CLOUDSDK_PYTHON`. The GitHub repository is private, so the source was copied with a tarball and `gcloud compute scp`; only the built `ui/dist` was copied separately. Debian 12 has no `docker-compose-plugin` package, so Compose v5.8.0 was installed as a standalone CLI plugin under `/usr/local/lib/docker/cli-plugins`.
+
+Key steps:
+
+```bash
+gcloud services enable compute.googleapis.com iamcredentials.googleapis.com \
+  storage.googleapis.com billingbudgets.googleapis.com
+gcloud billing budgets create --billing-account=<BILLING_ACCOUNT_ID> \
+  --display-name="Soundseek trial (50 EUR)" --budget-amount=50EUR \
+  --filter-projects=projects/<PROJECT_ID> \
+  --threshold-rule=percent=0.50 --threshold-rule=percent=0.90 \
+  --threshold-rule=percent=1.00
+gcloud iam service-accounts create soundseek-app --display-name="Soundseek app (trial)"
+gcloud storage buckets create gs://<BUCKET_NAME> \
+  --location=us-central1 --uniform-bucket-level-access
+gcloud storage buckets add-iam-policy-binding gs://<BUCKET_NAME> \
+  --member=serviceAccount:<SA_EMAIL> \
+  --role=roles/storage.objectAdmin
+gcloud iam service-accounts add-iam-policy-binding \
+  <SA_EMAIL> \
+  --member=serviceAccount:<SA_EMAIL> \
+  --role=roles/iam.serviceAccountTokenCreator
+gcloud compute instances create soundseek-trial --zone=us-central1-a \
+  --machine-type=e2-standard-2 --boot-disk-size=50GB --boot-disk-type=pd-balanced \
+  --image-family=debian-12 --image-project=debian-cloud \
+  --service-account=<SA_EMAIL> \
+  --scopes=https://www.googleapis.com/auth/cloud-platform --tags=soundseek-trial
+```
+
+On the VM, `.env` uses `STORAGE_BACKEND=gcs`, `GCS_BUCKET`, `GCS_PROJECT_ID`, `GCS_SIGNER_SERVICE_ACCOUNT`, `GENERATOR=mock`, `GUNICORN_WORKERS=2`, `DOMAIN=<VM_IP>.sslip.io`. Then:
+
+```bash
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T api \
+  python /db/seed.py --dsn "$DSN" --count 200000
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T api \
+  python /scripts/reindex.py --dsn "$DSN" --collection sounds_v2 \
+  --with-embeddings --limit 10000 --set-alias
+```
+
+Verified from the public HTTPS endpoint: `/health` and `/api/health` return `{"status":"ok","database":"connected"}`, `/` serves `<title>Soundseek</title>`, `q=door` returns 833 hits in 7 ms, `mode=hybrid` with `heavy metallic door sound` returns 586 hits in 19 ms, two identical `/generate` calls return the same `sound_id` with `idempotent: true` on the second, the GCS signed preview URL returns **200 audio/mpeg** (17,180 bytes), `/download` returns **403** without `X-Subscriber: true`, and the generated sound is searchable. Full numbers are in `docs/PERFORMANCE.md`.
+
+### Trial teardown (irreversible)
+
+Stop the VM when not in use; delete everything before the trial credit expires on 2026-02-25 or the account starts charging.
+
+```bash
+export PROJECT_ID=<PROJECT_ID>
+gcloud compute instances stop soundseek-trial --zone=us-central1-a
+gcloud compute instances delete soundseek-trial --zone=us-central1-a --quiet
+gcloud compute firewall-rules delete allow-soundseek-trial-web allow-soundseek-trial-ssh --quiet
+gcloud storage rm -r gs://<BUCKET_NAME>
+gcloud iam service-accounts delete \
+  <SA_EMAIL> --quiet
+gcloud billing budgets delete <BUDGET_ID> \
+  --billing-account=<BILLING_ACCOUNT_ID> --quiet
+gcloud projects delete "$PROJECT_ID" --quiet
+```
 
 ## Free-tier demo path ($0 within quotas)
 

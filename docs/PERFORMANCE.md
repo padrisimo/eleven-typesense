@@ -1,6 +1,23 @@
 # Performance and design notes
 
-Environment for all numbers: Colima (4 vCPU / 8 GiB), PostgreSQL 16.16, Typesense 30.2, 200,000 reproducible sounds (`random.seed(42)`), 10 categories, 2,976 rows with `bpm`. Timings are medians of repeated runs on this machine, not production benchmarks.
+Environment for local numbers: Colima (4 vCPU / 8 GiB), PostgreSQL 16.16, Typesense 30.2, 200,000 reproducible sounds (`random.seed(42)`), 10 categories, 2,976 rows with `bpm`. Timings are medians of repeated runs on this machine, not production benchmarks.
+
+## Executed GCP trial deployment (single run, 2026-11-26)
+
+Environment: `e2-standard-2` (2 vCPU / 8 GiB), 50 GB `pd-balanced`, Debian 12, the same Compose stack behind Caddy at `https://<VM_IP>.sslip.io`, 200,000 seeded sounds, 10,000 of them in `sounds_v2` with embeddings, audio in GCS and `GENERATOR=mock`. These are single passes through the public HTTPS endpoint, not medians; the local table below remains the controlled comparison.
+
+| Check | Result |
+|---|---|
+| `GET /health` and `GET /api/health` | `{"status":"ok","database":"connected"}`, real LE certificate via `sslip.io` |
+| `GET /` | `<title>Soundseek</title>` served from `ui/dist` by Caddy |
+| `GET /search?q=door` | `found=833`, `search_time_ms=7`, top `Rusty Door Closing` |
+| `GET /search?q=heavy metallic door sound&mode=hybrid` | `found=586`, `search_time_ms=19`, top `Heavy Door Closing` |
+| Two identical `POST /generate` calls | same `sound_id=200001`, second `idempotent: true`, both `indexed: true` |
+| GCS V4 signed preview URL | **200**, `audio/mpeg`, 17,180 bytes, signed via IAM `signBlob` (no key on disk) |
+| `GET /sounds/200001/download` without header | **403**; with `X-Subscriber: true` a 5-minute signed URL |
+| Search for the generated prompt | `found=1`, top `heavy metallic door slam` |
+
+The remote run confirms the parts that cannot be exercised locally: Caddy TLS with `sslip.io`, the built UI behind the same origin, GCS signed URLs with the attached service account, and `mode=hybrid` against the aliased `sounds_v2` collection.
 
 ## PostgreSQL indexes: before / after (`EXPLAIN ANALYZE`, 3 runs each)
 
