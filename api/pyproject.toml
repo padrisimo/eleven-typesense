@@ -1,0 +1,41 @@
+[project]
+name = "soundsnap-api"
+version = "0.1.0"
+description = "Sound effects search API"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.165.0",
+    "uvicorn[standard]==0.54.0",
+    "gunicorn==23.0.0",
+    "psycopg[binary,pool]==3.3.9",
+    "pydantic==2.11.0",
+    "pydantic-settings==2.16.3",
+    "typesense==2.2.0",
+    "httpx==0.28.1",
+    "python-multipart==0.0.20",
+    "python-dotenv>=1.2.2,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.11.0",
+    "pytest==8.4.0",
+    "pytest-asyncio==0.25.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "PTH", "SIM", "T20"]
+ignore = ["S101", "S106", "B008"]
+src = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = true

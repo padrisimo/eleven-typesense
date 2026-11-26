@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16.16-alpine3.24
+    container_name: eleven-typesense-db
+    environment:
+      POSTGRES_DB: soundsnap
+      POSTGRES_USER: soundsnap
+      POSTGRES_PASSWORD: soundsnap
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql:ro
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soundsnap -d soundsnap"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  typesense:
+    image: typesense/typesense:30.2
+    container_name: eleven-typesense-typesense
+    command: >
+      --data-dir /data
+      --api-key ${TYPESENSE_API_KEY:-xyz}
+      --enable-cors
+    volumes:
+      - tsdata:/data
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "timeout 2 bash -c 'exec 3<>/dev/tcp/localhost/8108 && printf \"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n\" >&3 && cat <&3 | head -1 | grep -q 200'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: eleven-typesense-api
+    environment:
+      DATABASE_URL: postgresql://soundsnap:soundsnap@db:5432/soundsnap
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz}
+      TYPESENSE_HOST: typesense
+      TYPESENSE_PORT: "8108"
+      TYPESENSE_PROTOCOL: http
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      LOCAL_STORAGE_PATH: /audio
+      GENERATOR: ${GENERATOR:-mock}
+      GENERATOR_FALLBACK_TO_MOCK: ${GENERATOR_FALLBACK_TO_MOCK:-true}
+      GENERATION_DAILY_LIMIT: ${GENERATION_DAILY_LIMIT:-10}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+    volumes:
+      - audio:/audio
+    networks:
+      - backend
+      - edge
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      typesense:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  backend:
+    driver: bridge
+  edge:
+    driver: bridge
+
+volumes:
+  pgdata:
+  tsdata:
+  audio:
+  caddy_data:
