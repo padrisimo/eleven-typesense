@@ -12,7 +12,6 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./db/indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql:ro
     networks:
       - backend
     restart: unless-stopped

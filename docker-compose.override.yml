@@ -14,4 +14,5 @@ services:
       PYTHONPATH: /app
     volumes:
       - ./api:/app
+      - ./db:/db:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
