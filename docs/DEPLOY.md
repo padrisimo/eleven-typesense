@@ -16,7 +16,7 @@ Resources created in project `<PROJECT_ID>` (display name *Soundseek Trial*) on 
 | Budget | 50 EUR, filtered to the project, alerts at 50/90/100 % (`<BUDGET_ID>`) |
 | DNS | `<VM_IP>.sslip.io`, real Let's Encrypt certificate issued by Caddy |
 
-`gcloud` on the operator machine is pinned to the uv-managed Python 3.12 via `CLOUDSDK_PYTHON`. The GitHub repository is private, so the source was copied with a tarball and `gcloud compute scp`; only the built `ui/dist` was copied separately. Debian 12 has no `docker-compose-plugin` package, so Compose v5.8.0 was installed as a standalone CLI plugin under `/usr/local/lib/docker/cli-plugins`.
+`gcloud` on the operator machine is pinned to the uv-managed Python 3.12 via `CLOUDSDK_PYTHON`. The repository is public and `git clone https://github.com/padrisimo/eleven-typesense.git` works from the VM without credentials (verified with an anonymous `git ls-remote` returning `137b2c1`). The deployed copy was transferred as a tarball because the repo was still private when the VM was prepared; the built `ui/dist` is copied separately in either case because the VM has no Node. Debian 12 has no `docker-compose-plugin` package, so Compose v5.8.0 was installed as a standalone CLI plugin under `/usr/local/lib/docker/cli-plugins`.
 
 Key steps:
 
