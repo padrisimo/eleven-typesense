@@ -211,3 +211,10 @@
 - **Reason:** `db/seed.py` assigns fictitious keys such as `library/explosions/007471.wav`, so `/sounds/{id}/preview` produced signed URLs to objects that do not exist (HTTP 404) and the UI played silence for nearly every search result. Sharing one real object makes all previews audible without uploading 200,000 files.
 - **Alternative rejected:** Adding an `exists` probe and a fallback branch to the `Storage` interface (cleaner but needs a code change, redeploy and an extra GCS call per preview), or uploading one object per fictitious key (200,000 uploads, slow and costly).
 - **When I would change it:** If the library gets real audio files, replace the script with a proper import that creates one object per row and restores each row's `format` metadata; today `format` stays as seeded because the index does not store `file_key`.
+
+## Revert the demo to the mock generator
+
+- **Decision:** Set `GENERATOR=mock` again in the VM `.env` and delete the `ELEVENLABS_API_KEY` line. ElevenLabs remains implemented behind the env switch, and generated sound `200004` stays in the database as evidence that the integration works.
+- **Reason:** The shared `library/demo-sample.mp3` made every preview audible, so the original complaint was solved without a third party. The Free plan is non-commercial, and this vertical slice is judged on search/index/performance decisions rather than on realistic generation. Mock is deterministic and keeps the smoke test stable.
+- **Alternative rejected:** Leaving ElevenLabs enabled for a more impressive demo — adds licensing ambiguity, third-party latency and a failure mode that is outside the scope of the slice.
+- **When I would change it:** If generation becomes a real requirement, rotate the key, set it only in the VM `.env` through `~/.elevenlabs_key`, set `GENERATOR=elevenlabs`, and move to a paid plan if the output is used commercially.
