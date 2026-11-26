@@ -56,6 +56,48 @@
 - **Alternative rejected:** A single warm run — too noisy to support a before/after claim.
 - **When I would change it:** On dedicated hardware with the dataset fully cached, fewer runs may be enough; still keep buffer counts.
 
+## Synchronous generation with an advisory lock (Phase 4)
+
+- **Decision:** `POST /generate` holds a Postgres session advisory lock keyed by the prompt hash for the whole synchronous flow.
+- **Reason:** Two concurrent identical requests must produce a single sound; the lock is simple and Postgres-native.
+- **Alternative rejected:** A race-prone check-then-insert without a lock, or a queue/worker (out of scope for the slice).
+- **When I would change it:** In production, enqueue a job with a lease/idempotency key and never hold a DB connection during an ElevenLabs call.
+
+## Rolling 24-hour generation limit counts attempts (Phase 4)
+
+- **Decision:** `GENERATION_DAILY_LIMIT` counts all `generation_jobs` rows created in the last 24 hours, including failed ones; idempotent hits bypass the limit.
+- **Reason:** Failed calls can still consume provider credits, and retries must not be an unlimited loophole.
+- **Alternative rejected:** Calendar-day counting (resets at midnight) or counting only successful generations.
+- **When I would change it:** With real accounts, key the limit by user/API key and use a quota table.
+
+## Typesense failure leaves `indexed_at` NULL (Phase 4)
+
+- **Decision:** The sound and job are committed to Postgres before the Typesense upsert; on index failure `indexed_at` stays NULL and `scripts/reindex.py --only-unindexed` repairs it.
+- **Reason:** A search-index outage must not lose generated audio or metadata; `indexed_at` acts as a minimal outbox.
+- **Alternative rejected:** One distributed transaction across Postgres and Typesense (not possible) or rolling back the sound.
+- **When I would change it:** With a queue, publish an indexing event and add retries plus monitoring.
+
+## Local signed URLs are an HMAC stub; GCS uses V4 signBlob (Phase 4)
+
+- **Decision:** The local backend returns `/audio/...?expires=&signature=` URLs verified by the API; the GCS backend V4-signs URLs through IAM `signBlob` when using an attached service account.
+- **Reason:** The demo needs expiring URLs without GCP; on a VM there is no private key on disk, and Google's documentation recommends IAM `signBlob` over downloading a service-account key.
+- **Alternative rejected:** Public bucket objects (no access control) or a downloaded service-account key (security risk).
+- **When I would change it:** If running outside GCP, mount a JSON key or use a secret manager; replace the `X-Subscriber` stub with real subscription tokens.
+
+## `X-Subscriber` is an auth stub (Phase 4)
+
+- **Decision:** `/sounds/{id}/download` requires `X-Subscriber: true`; preview is public.
+- **Reason:** Demonstrates the access-control boundary without building authentication in a vertical slice.
+- **Alternative rejected:** No check (hides the requirement) or full OAuth/JWT (out of scope).
+- **When I would change it:** Validate a real session/subscription token at the edge and in the API before production.
+
+## ElevenLabs fallback on 401/402/403 with honest licensing (Phase 4)
+
+- **Decision:** `GENERATOR=elevenlabs` calls the official `POST https://api.elevenlabs.io/v1/sound-generation` (`xi-api-key`, `text`, optional `duration_seconds` in 0.5–30 s, `output_format` query param) and falls back to the mock only on 401/402/403 when enabled; the stored license reflects the audio actually used.
+- **Reason:** Free plans often lack sound-effects access; a narrow fallback keeps the demo runnable without hiding outages or mislabelling free-plan audio.
+- **Alternative rejected:** Falling back on every error (masks provider incidents) or storing a commercial license for free-plan audio.
+- **When I would change it:** Once the endpoint and commercial license are enabled, remove the fallback and store the real license.
+
 ## Reproducible seed with `COPY` and varied `created_at` (Phase 1)
 
 - **Decision:** `db/seed.py` uses `random.seed(42)`, `psycopg`'s `copy.write_row()` and spreads `created_at` over 730 days from 2023-01-01.

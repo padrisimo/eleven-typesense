@@ -70,6 +70,24 @@ curl 'http://localhost:8000/search?q=xyzzynonexistent'
 }
 ```
 
+## Generation and signed URLs (Phase 4, verified)
+
+```bash
+curl -s -X POST http://localhost:8000/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"heavy metallic door slam","duration_seconds":2}'
+```
+
+```json
+{"sound_id": 200005, "idempotent": false, "indexed": true, "license": "mock"}
+```
+
+The same prompt again returns the same `sound_id` with `idempotent: true` and creates no second sound. The new record is immediately searchable through the `sounds` alias. `GENERATOR=elevenlabs` uses the official `POST /v1/sound-generation` endpoint; on 401/402/403 it falls back to the mock when `GENERATOR_FALLBACK_TO_MOCK=true`.
+
+`GET /sounds/{id}/preview` returns a 30-second signed URL; `GET /sounds/{id}/download` requires `X-Subscriber: true` and returns a 5-minute URL. With `STORAGE_BACKEND=local` these URLs are HMAC-signed and served by `/audio/{key}`.
+
+Run the end-to-end smoke test with `./scripts/smoke.sh`.
+
 ## Documentation
 
 - `docs/ARCHITECTURE.md` — architecture diagram (Phase 6)

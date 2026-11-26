@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,9 +14,11 @@ class Settings(BaseSettings):
 
     storage_backend: str = "local"
     local_storage_path: str = "./audio"
+    local_signing_secret: str = "dev-secret"
     gcs_bucket: str | None = None
     gcs_project_id: str | None = None
     gcs_credentials_path: str | None = None
+    gcs_signer_service_account: str | None = None
 
     generator: str = "mock"
     generator_fallback_to_mock: bool = True

@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
-from psycopg_pool import AsyncConnectionPool
-from psycopg.rows import dict_row
-from .config import get_settings
 
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
+
+from .config import get_settings
 
 _pool: AsyncConnectionPool | None = None
 
@@ -40,6 +41,11 @@ async def get_connection():
 async def get_transaction():
     if _pool is None:
         raise RuntimeError("Database pool not initialized")
-    async with _pool.connection() as conn:
-        async with conn.transaction():
-            yield conn
+    async with _pool.connection() as conn, conn.transaction():
+        yield conn
+
+
+async def fetchone(conn, query: str, params: tuple | None = None):
+    async with conn.cursor() as cur:
+        await cur.execute(query, params)
+        return await cur.fetchone()

@@ -1,17 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import BinaryIO
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class GeneratedAudio:
+    data: bytes
+    content_type: str
+    license: str
 
 
 class SoundGenerator(ABC):
     @abstractmethod
-    async def generate(self, prompt: str, duration_seconds: int | None) -> tuple[bytes, str]:
-        """
-        Generate audio from prompt.
-        Returns (audio_data, content_type).
-        """
-        pass
-
-    @abstractmethod
-    def get_license(self) -> str:
-        """Return the license string for generated audio."""
-        pass
+    async def generate(self, prompt: str, duration_seconds: int | None) -> GeneratedAudio:
+        """Generate audio and report the license that applies to it."""

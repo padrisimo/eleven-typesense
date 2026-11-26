@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from .config import get_settings
-from .db import init_db, close_db
-from .routes import health, search, sounds, generate
+
+from .db import close_db, init_db
+from .routes import generate, health, search, sounds
 
 
 @asynccontextmanager
@@ -13,7 +14,6 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    settings = get_settings()
     app = FastAPI(
         title="Soundsnap API",
         version="0.1.0",

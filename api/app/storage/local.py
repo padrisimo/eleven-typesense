@@ -1,9 +1,19 @@
-import os
-import aiofiles
+import hashlib
+import hmac
+import time
 from pathlib import Path
 from typing import BinaryIO
-from .base import Storage
+from urllib.parse import quote
+
 from ..config import get_settings
+from .base import Storage
+
+
+def sign_local_url(key: str, expires: int) -> str:
+    settings = get_settings()
+    message = f"{key}:{expires}".encode()
+    secret = settings.local_signing_secret.encode("utf-8")
+    return hmac.new(secret, message, hashlib.sha256).hexdigest()
 
 
 class LocalStorage(Storage):
@@ -13,23 +23,19 @@ class LocalStorage(Storage):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     async def upload(self, key: str, data: BinaryIO, content_type: str) -> str:
-        file_path = self.base_path / key
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(file_path, "wb") as f:
-            content = data.read()
-            await f.write(content)
+        path = self.base_path / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data.seek(0)
+        path.write_bytes(data.read())
         return key
 
     async def download(self, key: str) -> bytes:
-        file_path = self.base_path / key
-        async with aiofiles.open(file_path, "rb") as f:
-            return await f.read()
+        return (self.base_path / key).read_bytes()
 
     async def delete(self, key: str) -> None:
-        file_path = self.base_path / key
-        if file_path.exists():
-            file_path.unlink()
+        (self.base_path / key).unlink(missing_ok=True)
 
     async def signed_url(self, key: str, ttl_seconds: int) -> str:
-        # In local mode, just return a local URL (would be proxied by API in real impl)
-        return f"/audio/{key}"
+        expires = int(time.time()) + ttl_seconds
+        signature = sign_local_url(key, expires)
+        return f"/audio/{quote(key, safe='/')}?expires={expires}&signature={signature}"

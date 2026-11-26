@@ -2,6 +2,7 @@ from typesense import Client
 
 from .config import get_settings
 
+ALIAS = "sounds"
 
 SCHEMA_V1 = {
     "name": "sounds_v1",
@@ -35,3 +36,7 @@ def get_typesense_client() -> Client:
             "connection_timeout_seconds": 300,
         }
     )
+
+
+def upsert_sound(document: dict) -> None:
+    get_typesense_client().collections[ALIAS].documents.upsert(document)

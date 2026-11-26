@@ -4,10 +4,9 @@
 import argparse
 import os
 import sys
-from datetime import datetime
 
 import psycopg
-from typesense.exceptions import ObjectAlreadyExists, ObjectNotFound
+from typesense.exceptions import ObjectAlreadyExists
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
 from app.search import SCHEMA_V1, get_typesense_client  # noqa: E402
